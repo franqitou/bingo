@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Bingo Caller - Números sólo (Proyector)</title>
+<style>
+  :root{
+    --bg:#071024;
+    --panel:#0b1220;
+    --accent:#ffca3a; /* color de realce para el número actual */
+    --highlight:#ff6b6b; /* color secundario de contraste */
+    --muted:#9aa4b2;
+  }
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial;}
+  body{background:linear-gradient(180deg,#041228 0%, #08162a 100%);color:#e6eef6;display:flex;align-items:center;justify-content:center;padding:18px}
+  .wrap{width:98%;max-width:1400px;padding:18px;box-sizing:border-box}
+  .top{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-bottom:18px}
+  .controls{display:flex;gap:8px;align-items:center}
+  .controls input[type=number]{width:90px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);color:inherit;font-weight:700}
+  .btn{background:var(--accent);border:none;padding:12px 16px;border-radius:12px;font-weight:800;color:#061223;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,0.5)}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+  .stage{display:flex;gap:26px;align-items:center}
+
+  /* Círculo grande (numero actual) */
+  .big{flex:0 0 520px;height:520px;border-radius:999px;background:radial-gradient(circle at 30% 25%, rgba(255,255,255,0.03), rgba(255,255,255,0.01));display:flex;align-items:center;justify-content:center;position:relative;box-shadow:0 30px 80px rgba(0,0,0,0.6), inset 0 6px 16px rgba(255,255,255,0.02);border:6px solid rgba(255,255,255,0.03);}
+  .label{position:absolute;top:18px;left:18px;font-size:16px;color:var(--muted);font-weight:700}
+  .number{font-size:240px;font-weight:900;line-height:1;letter-spacing:-6px;color:var(--accent);text-shadow:0 6px 30px rgba(255,202,58,0.12)}
+  .big.glow{box-shadow:0 30px 120px rgba(255,202,58,0.12), 0 6px 30px rgba(0,0,0,0.6);} /* efecto cuando suena uno nuevo */
+
+  /* Historial grande para proyector */
+  .history{flex:1;min-height:520px;padding:18px;border-radius:18px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));display:flex;flex-direction:column;gap:14px;align-items:center;overflow:auto}
+  .history h3{margin:0;font-size:20px}
+  .hist-row{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;padding-top:8px}
+  .pill{width:100px;height:100px;border-radius:999px;background:rgba(255,255,255,0.03);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:36px;box-shadow:0 6px 18px rgba(0,0,0,0.45);transition:transform .18s ease, box-shadow .18s ease, background .18s ease}
+  .pill.called{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));color:#e6eef6}
+
+  /* estilo para el número actual dentro del historial */
+  .pill.current{width:120px;height:120px;font-size:44px;background:linear-gradient(135deg,var(--accent),var(--highlight));color:#061223;box-shadow:0 24px 60px rgba(255,110,110,0.18), 0 6px 22px rgba(0,0,0,0.6);transform:scale(1.06)}
+
+  /* pequeño glow animado para llamar la atención en el proyector */
+  .pulse{animation:pulse 1s ease-out 0s 1}
+  @keyframes pulse{0%{box-shadow:0 24px 60px rgba(255,110,110,0.28)}50%{box-shadow:0 40px 100px rgba(255,110,110,0.14)}100%{box-shadow:0 24px 60px rgba(255,110,110,0.12)}}
+
+  .smallnote{color:var(--muted);font-size:14px}
+  footer{margin-top:14px;color:var(--muted);font-size:13px;text-align:center}
+
+  @media (max-width:1200px){
+    .big{flex:0 0 420px;height:420px}
+    .number{font-size:180px}
+    .pill{width:84px;height:84px;font-size:28px}
+    .pill.current{width:100px;height:100px;font-size:36px}
+  }
+  @media (max-width:880px){
+    .stage{flex-direction:column}
+    .big{flex:0 0 320px;height:320px}
+    .number{font-size:120px}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap" role="application" aria-label="Bingo caller web para proyector">
+    <div class="top">
+      <div>
+        <div style="font-size:20px;font-weight:800">Bingo — Proyector (Números)</div>
+        <div class="smallnote">Historial grande, auto-draw y número actual resaltado. Guardá este archivo como <strong>bingo_projector.html</strong>.</div>
+      </div>
+
+      <div class="controls">
+        <div class="settings">
+          <label class="smallnote" for="max">Rango</label>
+          <input id="max" type="number" min="2" value="90" />
+        </div>
+
+        <div class="settings">
+          <label class="smallnote" for="interval">Intervalo (s)</label>
+          <input id="interval" type="number" min="1" value="4" />
+        </div>
+
+        <button id="start" class="btn">Start</button>
+        <button id="pause" class="btn ghost">Pause</button>
+        <button id="next" class="btn ghost">Next</button>
+        <button id="reset" class="btn ghost">Reset</button>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="big" id="big" title="Doble click para pantalla completa">
+        <div class="label">Número actual</div>
+        <div class="number" id="current">—</div>
+      </div>
+
+      <div class="history" aria-live="polite">
+        <h3>Historial</h3>
+        <div class="hist-row" id="historyRow" aria-hidden="false"></div>
+        <div class="smallnote" style="margin-top:10px">El número más reciente aparece primero. Doble-click en la bola grande para pantalla completa.</div>
+      </div>
+    </div>
+
+    <footer>
+      Atajo: tecla N = siguiente; tecla P = pausa/continuar; F11 para pantalla completa.
+    </footer>
+  </div>
+
+<script>
+  const maxInput = document.getElementById('max');
+  const intervalInput = document.getElementById('interval');
+  const startBtn = document.getElementById('start');
+  const pauseBtn = document.getElementById('pause');
+  const nextBtn = document.getElementById('next');
+  const resetBtn = document.getElementById('reset');
+  const currentEl = document.getElementById('current');
+  const historyRow = document.getElementById('historyRow');
+  const bigWrap = document.getElementById('big');
+
+  let pool = [];
+  let drawn = [];
+  let timer = null;
+  let playing = false;
+
+  function buildPool(){
+    const max = Math.max(2, Math.floor(Number(maxInput.value) || 90));
+    pool = Array.from({length:max},(_,i)=>i+1);
+    shuffle(pool);
+    drawn = [];
+    render();
+  }
+
+  function shuffle(a){
+    for(let i=a.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i],a[j]]=[a[j],a[i]];
+    }
+  }
+
+  function drawOne(){
+    if(pool.length === 0){
+      currentEl.textContent = 'FIN';
+      stopAuto();
+      return;
+    }
+    const n = pool.pop();
+    drawn.unshift(n); // newest first
+
+    // animación breve
+    bigWrap.classList.add('glow');
+    setTimeout(()=> bigWrap.classList.remove('glow'), 900);
+
+    currentEl.textContent = n;
+    renderHistory();
+
+    // aria announcement
+    currentEl.setAttribute('aria-live','polite');
+  }
+
+  function renderHistory(){
+    historyRow.innerHTML = '';
+    // mostrar hasta 60 históricos (ajustable)
+    const limit = Math.min(drawn.length, 60);
+    for(let i=0;i<limit;i++){
+      const val = drawn[i];
+      const pill = document.createElement('div');
+      pill.textContent = val;
+      pill.title = `Llamado #${i+1}`;
+      if(i===0){
+        pill.className = 'pill current pulse';
+      } else {
+        pill.className = 'pill called';
+      }
+      historyRow.appendChild(pill);
+    }
+  }
+
+  function render(){
+    currentEl.textContent = drawn[0] || '—';
+    renderHistory();
+  }
+
+  function startAuto(){
+    if(playing) return;
+    playing = true;
+    startBtn.disabled = true;
+    pauseBtn.disabled = false;
+    const sec = Math.max(1, Math.floor(Number(intervalInput.value) || 4));
+    timer = setInterval(()=> {
+      drawOne();
+      if(pool.length===0) stopAuto();
+    }, sec*1000);
+  }
+
+  function stopAuto(){
+    playing=false;
+    startBtn.disabled=false;
+    clearInterval(timer);
+    timer=null;
+  }
+
+  // eventos
+  startBtn.addEventListener('click', ()=> {
+    if(pool.length === 0) buildPool();
+    startAuto();
+    drawOne(); // llamar uno de entrada para que no espere el intervalo
+  });
+
+  pauseBtn.addEventListener('click', ()=> {
+    if(playing) stopAuto(); else startAuto();
+  });
+
+  nextBtn.addEventListener('click', ()=> {
+    if(pool.length === 0) return;
+    drawOne();
+  });
+
+  resetBtn.addEventListener('click', ()=> {
+    stopAuto();
+    buildPool();
+  });
+
+  document.addEventListener('keydown', (e)=>{
+    if(e.key==='n' || e.key==='N') { drawOne(); }
+    if(e.key==='p' || e.key==='P'){ if(playing) stopAuto(); else startAuto(); }
+  });
+
+  // iniciar
+  buildPool();
+
+  // doble click en el circulo grande pone a pantalla completa
+  bigWrap.addEventListener('dblclick', ()=> {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+    else document.exitFullscreen().catch(()=>{});
+  });
+</script>
+</body>
+</html>
